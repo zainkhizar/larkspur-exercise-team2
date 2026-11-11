@@ -9,16 +9,63 @@ Where you edit:   grep -n '✏' agent.py   (six marks, one per place)
 Steps and gates:  https://anthropicpartnerbasecamp.bts.com/
 """
 from __future__ import annotations
+import re
 from typing import Any, Dict, List
 from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
                      new_session, next_available_day, record_tool_result,
                      runtime_preamble)
+from support import mock_backend as backend
 
 MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human takes over.
 
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
-EXTRA_TOOLS: List[Dict[str, Any]] = []   # ✏️ Build 2, step 2.1: schemas for the tools you add
-LOCAL_TOOLS: Dict[str, Any] = {}         # ✏️ Build 2, step 2.1: the functions behind them
+GROUND_STOP = re.compile(r"ground stop (\d{2}:\d{2})-(\d{2}:\d{2})")
+
+
+def ground_stop_status(airport: str = "DEN") -> Dict[str, Any]:
+    """Is the airport inside a ground stop at the fixture clock, and until when.
+
+    Reads the window out of flights.csv remarks, since no column carries it, and
+    compares it with the one 'now' the sample data uses. It does not guess: an
+    airport with no stated window comes back as no_window_in_data, which is a
+    different fact from 'not stopped'.
+    """
+    now = backend.FIXTURE_CLOCK
+    for row in backend.load_flights():
+        if row["date"] != now.date().isoformat() or airport not in (row["origin"], row["dest"]):
+            continue
+        found = GROUND_STOP.search(row["remarks"])
+        if not found:
+            continue
+        start, end = (now.replace(hour=int(t[:2]), minute=int(t[3:]), second=0, microsecond=0)
+                      for t in found.groups())
+        return {"airport": airport, "stopped": start <= now < end,
+                "until_local": found.group(2), "as_of": now.isoformat(),
+                "source": "flights.csv remarks, " + row["flight_no"]}
+    return {"airport": airport, "stopped": None, "status": "no_window_in_data",
+            "as_of": now.isoformat()}
+
+
+EXTRA_TOOLS: List[Dict[str, Any]] = [{   # ✏️ Build 2, step 2.1: schemas for the tools you add
+    "name": "ground_stop_status",
+    "description": (
+        "Check whether an airport is currently under an FAA ground stop and when it "
+        "is expected to lift. Use it when a customer asks if their airport is still "
+        "stopped or how long a hold will last. Not for one flight's status: that is "
+        "get_flight_status. Returns stopped, the local lift time, and as_of."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {"airport": {"type": "string", "description": (
+            "IATA code, for example DEN. Take it from the disrupted segment's origin "
+            "or destination, never from memory."
+        )}},
+        "required": ["airport"],
+    },
+}]
+LOCAL_TOOLS: Dict[str, Any] = {          # ✏️ Build 2, step 2.1: the functions behind them
+    "ground_stop_status": ground_stop_status,
+}
 
 
 def text_of(response) -> str:
