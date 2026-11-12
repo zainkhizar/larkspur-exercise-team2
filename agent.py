@@ -200,8 +200,8 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # âœï¸
     ]
 
     response = client.messages.create(
-        model=MODEL, max_tokens=4096, system=system_blocks,
-        thinking={"type": "adaptive"}, tools=tools, messages=messages,
+        model=MODEL, max_tokens=2048, system=system_blocks,
+        tools=tools, messages=messages,
     )
 
     answer = ""
@@ -210,8 +210,8 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # âœï¸
         messages.append({"role": "assistant", "content": response.content})
         messages.append({"role": "user", "content": tool_results(response)})
         response = client.messages.create(
-            model=MODEL, max_tokens=4096, system=system_blocks,
-            thinking={"type": "adaptive"}, tools=tools, messages=messages,
+            model=MODEL, max_tokens=2048, system=system_blocks,
+            tools=tools, messages=messages,
         )
         turns += 1
 
