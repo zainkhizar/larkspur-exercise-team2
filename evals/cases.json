@@ -124,6 +124,9 @@
     },
     {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b21ba2e (feature/tone2)
       "id": "team-0101",
       "suite": "team2",
       "hard_gate": false,
@@ -151,6 +154,7 @@
       ]
     },
     {
+<<<<<<< HEAD
       "id": "delay-0101",
       "suite": "entitlements",
       "hard_gate": false,
@@ -179,6 +183,8 @@
     {
 =======
 >>>>>>> 2a77965 (tane2)
+=======
+>>>>>>> b21ba2e (feature/tone2)
       "id": "tone-0102",
       "suite": "tone_safety",
       "hard_gate": false,
