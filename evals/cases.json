@@ -123,6 +123,7 @@
       ]
     },
     {
+<<<<<<< HEAD
       "id": "team-0101",
       "suite": "team2",
       "hard_gate": false,
@@ -176,6 +177,8 @@
       ]
     },
     {
+=======
+>>>>>>> 2a77965 (tane2)
       "id": "tone-0102",
       "suite": "tone_safety",
       "hard_gate": false,
@@ -199,6 +202,7 @@
           "type": "judge"
         }
       ]
+<<<<<<< HEAD
     },
     {
       "id": "scope-0102",
@@ -228,3 +232,8 @@
     }
   ]
 }
+=======
+    }
+  ]
+}
+>>>>>>> 2a77965 (tane2)
