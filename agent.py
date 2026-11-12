@@ -40,9 +40,51 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
             "required": ["origin", "dest", "date"],
         },
     },
+    {
+        "name": "cause_in_plain_words",
+        "description": (
+            "Turn a disruption cause code into the customer-facing wording Larkspur's "
+            "policy approves, so you can tell the customer why their flight was delayed, "
+            "cancelled or diverted in words they can repeat to someone else. Call it "
+            "after get_flight_status has given you the cause code, and before you "
+            "explain the cause to the customer. Use the returned customer_label as the "
+            "reason; never show the raw code or describe the cause in your own words."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "cause_code": {
+                    "type": "string", "enum": ["WX", "ATC", "MX", "CREW", "SEC"],
+                    "description": "The cause code exactly as get_flight_status returned it.",
+                },
+                "language": {
+                    "type": "string", "enum": ["en", "es"],
+                    "description": "The customer's language from lookup_booking. Defaults to en.",
+                },
+            },
+            "required": ["cause_code"],
+        },
+    },
 ]
+
+
+def cause_in_plain_words(cause_code: str, language: str = "en") -> Dict[str, Any]:
+    """Look up the customer wording for one cause in disruption_policy.json."""
+    import json, os
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "data", "americas", "disruption_policy.json")
+    with open(path, encoding="utf-8") as fh:
+        labels = json.load(fh)["cause_labels_customer"]
+    code = str(cause_code).strip().upper()
+    if code not in labels:
+        return {"error": "Unknown cause_code %r. Known codes: %s" % (cause_code, ", ".join(labels))}
+    lang = language if language in labels[code] else "en"
+    return {"cause_code": code, "language": lang, "customer_label": labels[code][lang]}
+
+
 LOCAL_TOOLS: Dict[str, Any] = {          # ✏️ Build 2, step 2.1: the functions behind them
     "next_available_day": next_available_day,
+    "cause_in_plain_words": cause_in_plain_words,
 }
 
 
