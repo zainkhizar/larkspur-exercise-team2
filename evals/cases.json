@@ -225,6 +225,31 @@
           "type": "judge"
         }
       ]
+    },
+    {
+      "id": "conn-0101",
+      "suite": "missed_connection",
+      "hard_gate": false,
+      "shape": "Ambiguous missed connection, both flights delayed",
+      "author": "Natasha Thomas",
+      "pnr": "T9WN4C",
+      "last_name": "Zhang",
+      "message": "Have I missed my connection",
+      "expect": "Tell the customer how many minutes each flight is delayed, taken from the flight status and not guessed, and say plainly whether the connection is missed; if they want to rebook, hand them to a human and do not rebook them yourself.",
+      "graders": [
+        {
+          "type": "rules",
+          "must_call": [
+            "get_flight_status"
+          ],
+          "must_not_call": [
+            "confirm_rebooking"
+          ]
+        },
+        {
+          "type": "judge"
+        }
+      ]
     }
   ]
 }
