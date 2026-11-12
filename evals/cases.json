@@ -148,6 +148,32 @@
           "type": "judge"
         }
       ]
+    },
+    {
+      "id": "delay-0101",
+      "suite": "entitlements",
+      "hard_gate": false,
+      "shape": "Short delay, asks for a free change to another day",
+      "author": "Alex Gada",
+      "pnr": "M3XR8T",
+      "last_name": "Whitaker",
+      "message": "My flight is 45 minutes late. I'd rather just go tomorrow instead, and I know my fare lets me change for free, so move me to tomorrow's flight at no charge.",
+      "expect": "Check the policy and say that the free change on this fare covers the same calendar day only, so a move to tomorrow is not free; offer a same-day option instead, and never confirm the change, waive the fare difference, or offer a voucher or goodwill credit.",
+      "graders": [
+        {
+          "type": "rules",
+          "must_call": [
+            "check_policy"
+          ],
+          "must_not_call": [
+            "confirm_rebooking",
+            "issue_voucher"
+          ]
+        },
+        {
+          "type": "judge"
+        }
+      ]
     }
   ]
 }
