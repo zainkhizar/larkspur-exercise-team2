@@ -9,12 +9,16 @@ Where you edit:   grep -n '✏' agent.py   (six marks, one per place)
 Steps and gates:  https://anthropicpartnerbasecamp.bts.com/
 """
 from __future__ import annotations
+import re
+from pathlib import Path
 from typing import Any, Dict, List
 from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
                      new_session, next_available_day, record_tool_result,
                      runtime_preamble)
 
 MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human takes over.
+FARE_RULES_PATH = Path(__file__).parent / "data" / "americas" / "fare_rules_excerpt.md"
+
 
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
 EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for the tools you add
@@ -65,6 +69,38 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
             "required": ["cause_code"],
         },
     },
+    # Served by the MCP server, which reads data/americas/fare_rules_excerpt.md and
+    # splits it on its "### " headings: the section list below mirrors that file.
+    {
+        "name": "fare_rules",
+        "description": (
+            "Read a section of Larkspur's Handbook (v14.3), the written rules behind "
+            "fares, disruptions and care. Call it whenever the customer asks WHY they do or "
+            "do not get something (a hotel, a meal credit, a refund, goodwill, a free "
+            "change), or what a rule says. Do this even when check_policy has already "
+            "returned a verdict: check_policy gives the outcome, this gives the reason in "
+            "the Handbook's own words, and the customer asked for the reason. Read the "
+            "section instead of explaining the rule from memory, and base your explanation "
+            "on it. Sections: 4 Fare families, 5 When we delay, cancel or divert, 6 Care "
+            "while you wait (meals, hotel, goodwill), 7 What chat automation will not do. "
+            "If check_policy and the Handbook ever disagree, the policy table wins."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "section": {
+                    "type": "string",
+                    "description": (
+                        "Handbook section number (4, 5, 6 or 7) or words from its title, "
+                        "e.g. '6' or 'care while you wait'. Fare family, refund or voluntary "
+                        "change: 4. Delay, cancellation or diversion remedies: 5. Hotel, meal "
+                        "or goodwill: 6. What a human must handle: 7."
+                    ),
+                },
+            },
+            "required": ["section"],
+        },
+    },
 ]
 
 
@@ -82,9 +118,28 @@ def cause_in_plain_words(cause_code: str, language: str = "en") -> Dict[str, Any
     return {"cause_code": code, "language": lang, "customer_label": labels[code][lang]}
 
 
+def fare_rules(section: str) -> str:
+    """Return one section of the Handbook excerpt, matched by number ("6") or by
+    words from its title ("care while you wait"). Unknown sections answer with
+    the list of valid ones, so Claude can retry."""
+    text = FARE_RULES_PATH.read_text(encoding="utf-8")
+    sections = []
+    for chunk in re.split(r"(?m)^### ", text)[1:]:
+        heading, _, body = chunk.partition("\n")
+        number, _, title = heading.partition(". ")
+        sections.append((number.strip(), title.strip(), "### " + chunk.strip()))
+    wanted = str(section).strip().lower().rstrip(".")
+    for number, title, full in sections:
+        if wanted == number or (wanted and wanted in title.lower()):
+            return full
+    valid = ", ".join(f"{n} ({t})" for n, t, _ in sections)
+    return f"No Handbook section matches '{section}'. Valid sections: {valid}."
+
+
 LOCAL_TOOLS: Dict[str, Any] = {          # ✏️ Build 2, step 2.1: the functions behind them
     "next_available_day": next_available_day,
     "cause_in_plain_words": cause_in_plain_words,
+    "fare_rules": fare_rules,
 }
 
 
