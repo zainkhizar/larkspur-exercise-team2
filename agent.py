@@ -9,6 +9,8 @@ Where you edit:   grep -n '✏' agent.py   (six marks, one per place)
 Steps and gates:  https://anthropicpartnerbasecamp.bts.com/
 """
 from __future__ import annotations
+import csv
+import json
 import re
 from pathlib import Path
 from typing import Any, Dict, List
@@ -35,6 +37,24 @@ def seats_left(flight_no: str, date: str, cabin: str = "Y") -> Dict[str, Any]:
                 "asked_cabin": cabin,
             }
     return {"error": f"No record of flight {flight_no} on {date} in flights.csv."}
+
+
+DATA_DIR = Path(__file__).resolve().parent / "data" / "americas"
+
+
+def ground_stop_status(airport, date):
+    """Flights on this date at this airport whose remarks mention a ground stop,
+    plus 'now'. If the file has none, say so; never fill the gap."""
+    now = json.loads((DATA_DIR / "bookings.json").read_text())["fixture_clock"]
+    with open(DATA_DIR / "flights.csv", newline="") as f:
+        hits = [{"flight_no": r["flight_no"], "status": r["status"], "remarks": r["remarks"]}
+                for r in csv.DictReader(f)
+                if r["date"] == date and airport.upper() in (r["origin"], r["dest"])
+                and "ground stop" in r["remarks"].lower()]
+    if not hits:
+        return {"airport": airport, "date": date,
+                "note": "No ground stop is on record in the flight data. That does not prove there is none."}
+    return {"airport": airport, "date": date, "now": now, "flights_mentioning_ground_stop": hits}
 
 
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
@@ -139,6 +159,32 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
             "required": ["flight_no", "date"],
         },
     },
+    {
+        "name": "ground_stop_status",
+        "description": (
+            "Find out whether an airport is under a ground stop, and until when. Returns "
+            "the current time and the flights whose remarks mention the stop; read the "
+            "stop window (for example 13:02-15:50) from those remarks. Use it when the "
+            "customer asks about the airport as a whole (\"is Denver still stopped?\"). "
+            "Unlike get_flight_status, which covers one flight number, this covers the "
+            "whole airport. If no end time appears in the remarks, say so; never guess "
+            "when it will lift."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "airport": {"type": "string", "description": (
+                    "Three-letter IATA code of the airport, for example DEN. Take it from "
+                    "the booking's segment origin or dest, not from guesswork."
+                )},
+                "date": {"type": "string", "description": (
+                    "Local date as YYYY-MM-DD, exactly as lookup_booking returns it in "
+                    "segment.date."
+                )},
+            },
+            "required": ["airport", "date"],
+        },
+    },
 ]
 
 
@@ -179,6 +225,7 @@ LOCAL_TOOLS: Dict[str, Any] = {          # ✏️ Build 2, step 2.1: the functio
     "cause_in_plain_words": cause_in_plain_words,
     "fare_rules": fare_rules,
     "seats_left": seats_left,
+    "ground_stop_status": ground_stop_status,
 }
 
 
