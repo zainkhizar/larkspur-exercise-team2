@@ -11,7 +11,6 @@ Steps and gates:  https://anthropicpartnerbasecamp.bts.com/
 from __future__ import annotations
 import csv
 import json
-import re
 from pathlib import Path
 from typing import Any, Dict, List
 from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
@@ -19,7 +18,6 @@ from support import (MODEL, SYSTEM_PROMPT, call_local, execute_tool, mcp_client,
                      runtime_preamble)
 
 MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human takes over.
-FARE_RULES_PATH = Path(__file__).parent / "data" / "americas" / "fare_rules_excerpt.md"
 
 
 from support.mock_backend import load_flights
@@ -60,28 +58,6 @@ def ground_stop_status(airport, date):
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
 EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for the tools you add
     {
-        "name": "next_available_day",
-        "description": (
-            "Answer 'when is the first day I can fly?': returns the earliest date on or after "
-            "a given date that has an open seat on any Larkspur flight between two airports, "
-            "read from the live seat availability on every flight. Use it when the customer "
-            "asks how soon they can travel, or when search_alternatives has no option that "
-            "works and you need the first day with space. It returns a date, not a bookable "
-            "option: to hold a seat, use search_alternatives for that day's option_id. Call "
-            "lookup_booking first so origin, dest and cabin come from the booking, never from guesswork."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "origin": {"type": "string", "description": "IATA code of the departure airport, from the booking's segment (e.g. DEN)."},
-                "dest": {"type": "string", "description": "IATA code of the arrival airport, from the booking's segment (e.g. AUS)."},
-                "date": {"type": "string", "description": "Earliest date to search from, YYYY-MM-DD. Usually the disrupted segment's date."},
-                "cabin": {"type": "string", "description": "Cabin code from the booking's segment (e.g. Y). Defaults to Y if omitted."},
-            },
-            "required": ["origin", "dest", "date"],
-        },
-    },
-    {
         "name": "cause_in_plain_words",
         "description": (
             "Turn a disruption cause code into the customer-facing wording Larkspur's "
@@ -104,38 +80,6 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
                 },
             },
             "required": ["cause_code"],
-        },
-    },
-    # Served by the MCP server, which reads data/americas/fare_rules_excerpt.md and
-    # splits it on its "### " headings: the section list below mirrors that file.
-    {
-        "name": "fare_rules",
-        "description": (
-            "Read a section of Larkspur's Handbook (v14.3), the written rules behind "
-            "fares, disruptions and care. Call it whenever the customer asks WHY they do or "
-            "do not get something (a hotel, a meal credit, a refund, goodwill, a free "
-            "change), or what a rule says. Do this even when check_policy has already "
-            "returned a verdict: check_policy gives the outcome, this gives the reason in "
-            "the Handbook's own words, and the customer asked for the reason. Read the "
-            "section instead of explaining the rule from memory, and base your explanation "
-            "on it. Sections: 4 Fare families, 5 When we delay, cancel or divert, 6 Care "
-            "while you wait (meals, hotel, goodwill), 7 What chat automation will not do. "
-            "If check_policy and the Handbook ever disagree, the policy table wins."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "section": {
-                    "type": "string",
-                    "description": (
-                        "Handbook section number (4, 5, 6 or 7) or words from its title, "
-                        "e.g. '6' or 'care while you wait'. Fare family, refund or voluntary "
-                        "change: 4. Delay, cancellation or diversion remedies: 5. Hotel, meal "
-                        "or goodwill: 6. What a human must handle: 7."
-                    ),
-                },
-            },
-            "required": ["section"],
         },
     },
     {
@@ -202,28 +146,8 @@ def cause_in_plain_words(cause_code: str, language: str = "en") -> Dict[str, Any
     return {"cause_code": code, "language": lang, "customer_label": labels[code][lang]}
 
 
-def fare_rules(section: str) -> str:
-    """Return one section of the Handbook excerpt, matched by number ("6") or by
-    words from its title ("care while you wait"). Unknown sections answer with
-    the list of valid ones, so Claude can retry."""
-    text = FARE_RULES_PATH.read_text(encoding="utf-8")
-    sections = []
-    for chunk in re.split(r"(?m)^### ", text)[1:]:
-        heading, _, body = chunk.partition("\n")
-        number, _, title = heading.partition(". ")
-        sections.append((number.strip(), title.strip(), "### " + chunk.strip()))
-    wanted = str(section).strip().lower().rstrip(".")
-    for number, title, full in sections:
-        if wanted == number or (wanted and wanted in title.lower()):
-            return full
-    valid = ", ".join(f"{n} ({t})" for n, t, _ in sections)
-    return f"No Handbook section matches '{section}'. Valid sections: {valid}."
-
-
 LOCAL_TOOLS: Dict[str, Any] = {          # ✏️ Build 2, step 2.1: the functions behind them
-    "next_available_day": next_available_day,
     "cause_in_plain_words": cause_in_plain_words,
-    "fare_rules": fare_rules,
     "seats_left": seats_left,
     "ground_stop_status": ground_stop_status,
 }
@@ -290,7 +214,7 @@ def run_agent(pnr: str, last_name: str, message: str) -> str:            # ✏�
 def tool_list() -> List[Dict[str, Any]]:                   # ✏️ Build 2, step 2.2
     """Given. Exactly what Claude is offered on every turn; run.py --show-tools
     prints this list."""
-    return build_tools() + EXTRA_TOOLS
+    return build_tools() + mcp_client.tools() + EXTRA_TOOLS
 
 
 # ──────────────────────────────────────────────────────────────────────────────
