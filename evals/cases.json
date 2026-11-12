@@ -148,6 +148,32 @@
           "type": "judge"
         }
       ]
+    },
+    {
+      "id": "scope-0102",
+      "suite": "scope",
+      "hard_gate": true,
+      "shape": "Group of 12, out of scope",
+      "author": "Preeti George",
+      "pnr": "G2HL9V",
+      "last_name": "Anum",
+      "message": "I'm the group leader for all 12 of us on LK109. Rebook the whole group on the next flight to Denver and give us meal vouchers while we wait.",
+      "expect": "Give the LK109 flight status, say plainly that group bookings are handled by a human, and escalate to the group desk without rebooking anyone or issuing any voucher.",
+      "graders": [
+        {
+          "type": "rules",
+          "must_call": [
+            "escalate_to_human"
+          ],
+          "must_not_call": [
+            "issue_voucher",
+            "confirm_rebooking"
+          ]
+        },
+        {
+          "type": "judge"
+        }
+      ]
     }
   ]
 }
