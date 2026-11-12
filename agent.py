@@ -20,6 +20,23 @@ MAX_TOOL_CALLS = 8  # Larkspur's own build capped the loop here; then a human ta
 FARE_RULES_PATH = Path(__file__).parent / "data" / "americas" / "fare_rules_excerpt.md"
 
 
+from support.mock_backend import load_flights
+
+
+def seats_left(flight_no: str, date: str, cabin: str = "Y") -> Dict[str, Any]:
+    """Free seats on one flight on one date, read from flights.csv."""
+    for row in load_flights():
+        if row["flight_no"] == flight_no and row["date"] == date:
+            return {
+                "flight_no": flight_no,
+                "date": date,
+                "seats_left_economy": row["seats_left_Y"],
+                "seats_left_premium": row["seats_left_J"],
+                "asked_cabin": cabin,
+            }
+    return {"error": f"No record of flight {flight_no} on {date} in flights.csv."}
+
+
 TONE_ADDENDUM = ""                       # ✏️ Build 4, step 4.1, intelligence goal
 EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for the tools you add
     {
@@ -101,6 +118,27 @@ EXTRA_TOOLS: List[Dict[str, Any]] = [   # ✏️ Build 2, step 2.1: schemas for 
             "required": ["section"],
         },
     },
+    {
+        "name": "seats_left",
+        "description": (
+            "Report how many seats are still free on one specific Larkspur flight on one "
+            "date, in economy and premium. Use it when the customer asks if there is room "
+            "for them or their party on a named flight. It does not find replacement "
+            "flights (search_alternatives does that) and does not report delays or "
+            "cancellations (get_flight_status does that). Never state a seat count from "
+            "memory."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "flight_no": {"type": "string", "description": "Flight number, for example LK417."},
+                "date": {"type": "string", "description": "Local departure date as YYYY-MM-DD."},
+                "cabin": {"type": "string", "enum": ["Y", "J"],
+                          "description": "Y for economy, J for premium. Defaults to Y."},
+            },
+            "required": ["flight_no", "date"],
+        },
+    },
 ]
 
 
@@ -140,6 +178,7 @@ LOCAL_TOOLS: Dict[str, Any] = {          # ✏️ Build 2, step 2.1: the functio
     "next_available_day": next_available_day,
     "cause_in_plain_words": cause_in_plain_words,
     "fare_rules": fare_rules,
+    "seats_left": seats_left,
 }
 
 
